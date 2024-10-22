@@ -46,6 +46,194 @@ func PrintMountedPartitions(buffer *bytes.Buffer) {
 	fmt.Fprintln(buffer, "")
 }
 
+// Función para eliminar particiones
+func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buffer) {
+	fmt.Println("======Start DELETE PARTITION======")
+	fmt.Println("Path:", path)
+	fmt.Println("Name:", name)
+	fmt.Println("Delete type:", delete_)
+
+	// Abrir el archivo binario en la ruta proporcionada
+	file, err := Utilidades.OpenFile(path)
+	if err != nil {
+		fmt.Println("Error: Could not open file at path:", path)
+		return
+	}
+
+	var TempMBR Estructura.MRB
+	// Leer el objeto desde el archivo binario
+	if err := Utilidades.ReadObject(file, &TempMBR, 0); err != nil {
+		fmt.Println("Error: Could not read MBR from file")
+		return
+	}
+
+	// Buscar la partición por nombre
+	found := false
+	for i := 0; i < 4; i++ {
+		// Limpiar los caracteres nulos al final del nombre de la partición
+		partitionName := strings.TrimRight(string(TempMBR.MRBPartitions[i].PART_Name[:]), "\x00")
+		if partitionName == name {
+			found = true
+
+			// Si es una partición extendida, eliminar las particiones lógicas dentro de ella
+			if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' {
+				fmt.Println("Eliminando particiones lógicas dentro de la partición extendida...")
+				ebrPos := TempMBR.MRBPartitions[i].PART_Start
+				var ebr Estructura.EBR
+				for {
+					err := Utilidades.ReadObject(file, &ebr, int64(ebrPos))
+					if err != nil {
+						fmt.Println("Error al leer EBR:", err)
+						break
+					}
+					// Detener el bucle si el EBR está vacío
+					if ebr.EBRStart == 0 && ebr.EBRSize == 0 {
+						fmt.Println("EBR vacío encontrado, deteniendo la búsqueda.")
+						break
+					}
+					// Depuración: Mostrar el EBR leído
+					fmt.Println("EBR leído antes de eliminar:")
+					Estructura.PrintEBR(buffer, ebr)
+
+					// Eliminar partición lógica
+					if delete_ == "fast" {
+						ebr = Estructura.EBR{}                           // Resetear el EBR manualmente
+						Utilidades.WriteObject(file, ebr, int64(ebrPos)) // Sobrescribir el EBR reseteado
+					} else if delete_ == "full" {
+						Utilidades.FillWithZeros(file, ebr.EBRStart, ebr.EBRSize)
+						ebr = Estructura.EBR{}                           // Resetear el EBR manualmente
+						Utilidades.WriteObject(file, ebr, int64(ebrPos)) // Sobrescribir el EBR reseteado
+					}
+
+					// Depuración: Mostrar el EBR después de eliminar
+					fmt.Println("EBR después de eliminar:")
+					Estructura.PrintEBR(buffer, ebr)
+
+					if ebr.EBRNext == -1 {
+						break
+					}
+					ebrPos = ebr.EBRNext
+				}
+			}
+
+			// Proceder a eliminar la partición (extendida, primaria o lógica)
+			if delete_ == "fast" {
+				// Eliminar rápido: Resetear manualmente los campos de la partición
+				TempMBR.MRBPartitions[i] = Estructura.Partition{} // Resetear la partición manualmente
+				fmt.Println("Partición eliminada en modo Fast.")
+			} else if delete_ == "full" {
+				// Eliminar completamente: Resetear manualmente y sobrescribir con '\0'
+				start := TempMBR.MRBPartitions[i].PART_Start
+				size := TempMBR.MRBPartitions[i].PART_Size
+				TempMBR.MRBPartitions[i] = Estructura.Partition{} // Resetear la partición manualmente
+				// Escribir '\0' en el espacio de la partición en el disco
+				Utilidades.FillWithZeros(file, start, size)
+				fmt.Println("Partición eliminada en modo Full.")
+
+				// Leer y verificar si el área está llena de ceros
+				Utilidades.VerifyZeros(file, start, size)
+			}
+			break
+		}
+	}
+
+	if !found {
+		// Buscar particiones lógicas si no se encontró en el MBR
+		fmt.Println("Buscando en particiones lógicas dentro de las extendidas...")
+		for i := 0; i < 4; i++ {
+			if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' { // Solo buscar dentro de particiones extendidas
+				ebrPos := TempMBR.MRBPartitions[i].PART_Start
+				var ebr Estructura.EBR
+				for {
+					err := Utilidades.ReadObject(file, &ebr, int64(ebrPos))
+					if err != nil {
+						fmt.Println("Error al leer EBR:", err)
+						break
+					}
+
+					// Depuración: Mostrar el EBR leído
+					fmt.Println("EBR leído:")
+					Estructura.PrintEBR(buffer, ebr)
+
+					logicalName := strings.TrimRight(string(ebr.EBRName[:]), "\x00")
+					if logicalName == name {
+						found = true
+						// Eliminar la partición lógica
+						if delete_ == "fast" {
+							ebr = Estructura.EBR{}                           // Resetear el EBR manualmente
+							Utilidades.WriteObject(file, ebr, int64(ebrPos)) // Sobrescribir el EBR reseteado
+							fmt.Println("Partición lógica eliminada en modo Fast.")
+						} else if delete_ == "full" {
+							Utilidades.FillWithZeros(file, ebr.EBRStart, ebr.EBRSize)
+							ebr = Estructura.EBR{}                           // Resetear el EBR manualmente
+							Utilidades.WriteObject(file, ebr, int64(ebrPos)) // Sobrescribir el EBR reseteado
+							Utilidades.VerifyZeros(file, ebr.EBRStart, ebr.EBRSize)
+							fmt.Println("Partición lógica eliminada en modo Full.")
+						}
+						break
+					}
+
+					if ebr.EBRNext == -1 {
+						break
+					}
+					ebrPos = ebr.EBRNext
+				}
+			}
+			if found {
+				break
+			}
+		}
+	}
+
+	if !found {
+		fmt.Println("Error: No se encontró la partición con el nombre:", name)
+		return
+	}
+
+	// Sobrescribir el MBR
+	if err := Utilidades.WriteObject(file, TempMBR, 0); err != nil {
+		fmt.Println("Error: Could not write MBR to file")
+		return
+	}
+
+	// Leer el MBR actualizado y mostrarlo
+	fmt.Println("MBR actualizado después de la eliminación:")
+	Estructura.PrintMBR(buffer, TempMBR)
+
+	// Si es una partición extendida, mostrar los EBRs actualizados
+	for i := 0; i < 4; i++ {
+		if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' {
+			fmt.Println("Imprimiendo EBRs actualizados en la partición extendida:")
+			ebrPos := TempMBR.MRBPartitions[i].PART_Start
+			var ebr Estructura.EBR
+			for {
+				err := Utilidades.ReadObject(file, &ebr, int64(ebrPos))
+				if err != nil {
+					fmt.Println("Error al leer EBR:", err)
+					break
+				}
+				// Detener el bucle si el EBR está vacío
+				if ebr.EBRStart == 0 && ebr.EBRSize == 0 {
+					fmt.Println("EBR vacío encontrado, deteniendo la búsqueda.")
+					break
+				}
+				// Depuración: Imprimir cada EBR leído
+				fmt.Println("EBR leído después de actualización:")
+				Estructura.PrintEBR(buffer, ebr)
+				if ebr.EBRNext == -1 {
+					break
+				}
+				ebrPos = ebr.EBRNext
+			}
+		}
+	}
+
+	// Cerrar el archivo binario
+	defer file.Close()
+
+	fmt.Println("======FIN DELETE PARTITION======")
+}
+
 // Funcion para eliminar una particion montada
 func EliminarDiscoPorRuta(ruta string, buffer *bytes.Buffer) {
 	discoID := generateDiskID(ruta)

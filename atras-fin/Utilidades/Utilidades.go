@@ -75,3 +75,47 @@ func ReadObject(file *os.File, data interface{}, position int64) error {
 	}
 	return nil
 }
+
+// Función para llenar el espacio con ceros (\0)
+func FillWithZeros(file *os.File, start int32, size int32) error {
+	// Posiciona el archivo al inicio del área que debe ser llenada
+	file.Seek(int64(start), 0)
+
+	// Crear un buffer lleno de ceros
+	buffer := make([]byte, size)
+
+	// Escribir los ceros en el archivo
+	_, err := file.Write(buffer)
+	if err != nil {
+		fmt.Println("Error al llenar el espacio con ceros:", err)
+		return err
+	}
+
+	fmt.Println("Espacio llenado con ceros desde el byte", start, "por", size, "bytes.")
+	return nil
+}
+
+// Función para verificar que un bloque del archivo esté lleno de ceros
+func VerifyZeros(file *os.File, start int32, size int32) {
+	zeros := make([]byte, size)
+	_, err := file.ReadAt(zeros, int64(start))
+	if err != nil {
+		fmt.Println("Error al leer la sección eliminada:", err)
+		return
+	}
+
+	// Verificar si todos los bytes leídos son ceros
+	isZeroFilled := true
+	for _, b := range zeros {
+		if b != 0 {
+			isZeroFilled = false
+			break
+		}
+	}
+
+	if isZeroFilled {
+		fmt.Println("La partición eliminada está completamente llena de ceros.")
+	} else {
+		fmt.Println("Advertencia: La partición eliminada no está completamente llena de ceros.")
+	}
+}

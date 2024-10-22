@@ -151,7 +151,9 @@ func Funcion_fdisk(input string, writer io.Writer) {
 	path := fs.String("path", "", "Ruta")
 	type_ := fs.String("type", "p", "Tipo")
 	fit := fs.String("fit", "wf", "Ajuste")
+	delete_ := fs.String("delete", "", "Eliminar")
 	name := fs.String("name", "", "Nombre")
+	//add := fs.String("add", "", "Agregar")
 
 	// Parsear los flags
 	fs.Parse(os.Args[1:])
@@ -167,12 +169,23 @@ func Funcion_fdisk(input string, writer io.Writer) {
 		flagValue = strings.Trim(flagValue, "\"")
 
 		switch flagName {
-		case "size", "fit", "unit", "path", "name", "type":
+		case "size", "fit", "unit", "path", "name", "type", "delete", "add":
 			fs.Set(flagName, flagValue)
 		default:
 			fmt.Println("Error: Etiqueta no encontrada")
 			return
 		}
+	}
+
+	// Validaciones para la opción -delete
+	if *delete_ != "" {
+		if *path == "" || *name == "" {
+			fmt.Println("Error: Para eliminar una partición, se requiere 'path' y 'name'.")
+			return
+		}
+		// Llamar a la función que elimina la partición
+		ManejadorDisco.DeletePartition(*path, *name, *delete_, writer.(*bytes.Buffer))
+		return
 	}
 
 	// Validaciones
