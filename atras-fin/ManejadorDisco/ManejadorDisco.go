@@ -102,83 +102,164 @@ func generateDiskID(path string) string {
 func Mkdisk(size int, fit string, unit string, path string, buffer *bytes.Buffer) {
 
 	fmt.Fprintln(buffer, "=-=-=-=-=-=-=INICIO MKDISK=-=-=-=-=-=-=")
-	//fmt.Fprintln(buffer, "Size:", size)
-	//fmt.Fprintln(buffer, "Fit:", fit)
-	//fmt.Fprintln(buffer, "Unit:", unit)
-	//fmt.Fprintln(buffer, "Path:", path)
 	println("Size:", size)
 	println("Fit:", fit)
 	println("Unit:", unit)
 	println("Path:", path)
+	// Validar fit bf/ff/wf
 
-	// ================================= VALIDACIONES =================================
-	if size <= 0 {
-		fmt.Fprintln(buffer, "Error: El tamaño debe ser mayor que 0.")
-		return
-	}
-
+	// Validar fit bf/ff/wf
 	if fit != "bf" && fit != "wf" && fit != "ff" {
-		fmt.Fprintln(buffer, "Error: El fit debe ser BF, WF, o FF.")
+		fmt.Println("Error: Fit debe ser bf, wf o ff")
 		return
 	}
 
+	// Validar size > 0
+	if size <= 0 {
+		fmt.Println("Error: Size debe ser mayor a 0")
+		return
+	}
+
+	// Validar unit k - m
 	if unit != "k" && unit != "m" {
-		fmt.Fprintln(buffer, "Error: La unit debe ser K o M.")
+		fmt.Println("Error: Las unidades válidas son k o m")
 		return
 	}
 
-	if path == "" {
-		fmt.Fprintln(buffer, "Error: La path es obligatoria.")
-		return
-	}
-
+	// Crear el archivo
 	err := Utilidades.CreateFile(path)
-
 	if err != nil {
-		fmt.Fprintln(buffer, "Error: ", err)
+		fmt.Println("Error:", err)
 		return
 	}
 
+	// Asignar tamaño en bytes
 	if unit == "k" {
 		size = size * 1024
 	} else {
 		size = size * 1024 * 1024
 	}
 
-	// ================================= ABRIR ARCHIVO =================================
-	archivo, err := Utilidades.OpenFile(path)
-
+	// Abrir el archivo binario
+	file, err := Utilidades.OpenFile(path)
 	if err != nil {
-		fmt.Fprintln(buffer, "Error: ", err)
 		return
 	}
 
-	// ================================= inicializar el archivo con 0
-	for i := 0; i < size; i++ {
-		err := Utilidades.WriteObject(archivo, byte(0), int64(i))
+	// Optimización: Escribir grandes bloques de ceros
+	blockSize := 1024 * 1024             // Bloques de 1MB
+	zeroBlock := make([]byte, blockSize) // Crear un bloque de ceros
+
+	remainingSize := size
+
+	for remainingSize > 0 {
+		if remainingSize < blockSize {
+			// Escribe lo que queda si es menor que el tamaño del bloque
+			zeroBlock = make([]byte, remainingSize)
+		}
+		_, err := file.Write(zeroBlock)
 		if err != nil {
-			fmt.Fprintln(buffer, "Error: ", err)
+			fmt.Println("Error escribiendo ceros:", err)
 			return
 		}
+		remainingSize -= blockSize
 	}
 
-	// ================================= Inicializar el MBR
-	var nuevo_mbr Estructura.MRB
-	nuevo_mbr.MRBSize = int32(size)
-	nuevo_mbr.MRBSignature = rand.Int31()
-	currentTime := time.Now()
-	fechaFormateada := currentTime.Format("02-01-2006")
-	copy(nuevo_mbr.MRBCreationDate[:], fechaFormateada)
-	copy(nuevo_mbr.MRBFit[:], fit)
+	// Crear el MBR
+	var newMRB Estructura.MRB
+	newMRB.MRBSize = int32(size)
+	newMRB.MRBSignature = rand.Int31() // Número aleatorio rand.Int31() genera solo números no negativos
+	copy(newMRB.MRBFit[:], fit)
 
-	// ================================= Escribir el MBR en el archivo
-	if err := Utilidades.WriteObject(archivo, nuevo_mbr, 0); err != nil {
-		fmt.Fprintln(buffer, "Error: ", err)
+	// Obtener la fecha actual en formato YYYY-MM-DD
+	currentTime := time.Now()
+	formattedDate := currentTime.Format("2006-01-02")
+	copy(newMRB.MRBCreationDate[:], formattedDate)
+
+	// Escribir el MBR en el archivo
+	if err := Utilidades.WriteObject(file, newMRB, 0); err != nil {
 		return
 	}
-	defer archivo.Close()
-	fmt.Fprintln(buffer, "Disco creado con éxito en la path: ", path)
-	println("Disco creado con éxito en la path: ", path)
+
+	// Leer el archivo y verificar el MBR
+	var TempMBR Estructura.MRB
+	if err := Utilidades.ReadObject(file, &TempMBR, 0); err != nil {
+		return
+	}
+
+	// Imprimir el MBR
+	Estructura.PrintMBR(buffer, TempMBR)
+
+	// Cerrar el archivo
+	defer file.Close()
+	// // ================================= VALIDACIONES =================================
+	// if size <= 0 {
+	// 	fmt.Fprintln(buffer, "Error: El tamaño debe ser mayor que 0.")
+	// 	return
+	// }
+
+	// if fit != "bf" && fit != "wf" && fit != "ff" {
+	// 	fmt.Fprintln(buffer, "Error: El fit debe ser BF, WF, o FF.")
+	// 	return
+	// }
+
+	// if unit != "k" && unit != "m" {
+	// 	fmt.Fprintln(buffer, "Error: La unit debe ser K o M.")
+	// 	return
+	// }
+
+	// if path == "" {
+	// 	fmt.Fprintln(buffer, "Error: La path es obligatoria.")
+	// 	return
+	// }
+
+	// err := Utilidades.CreateFile(path)
+
+	// if err != nil {
+	// 	fmt.Fprintln(buffer, "Error: ", err)
+	// 	return
+	// }
+
+	// if unit == "k" {
+	// 	size = size * 1024
+	// } else {
+	// 	size = size * 1024 * 1024
+	// }
+
+	// // ================================= ABRIR ARCHIVO =================================
+	// archivo, err := Utilidades.OpenFile(path)
+
+	// if err != nil {
+	// 	fmt.Fprintln(buffer, "Error: ", err)
+	// 	return
+	// }
+
+	// // ================================= inicializar el archivo con 0
+	// for i := 0; i < size; i++ {
+	// 	err := Utilidades.WriteObject(archivo, byte(0), int64(i))
+	// 	if err != nil {
+	// 		fmt.Fprintln(buffer, "Error: ", err)
+	// 		return
+	// 	}
+	// }
+
+	// // ================================= Inicializar el MBR
+	// var nuevo_mbr Estructura.MRB
+	// nuevo_mbr.MRBSize = int32(size)
+	// nuevo_mbr.MRBSignature = rand.Int31()
+	// currentTime := time.Now()
+	// fechaFormateada := currentTime.Format("02-01-2006")
+	// copy(nuevo_mbr.MRBCreationDate[:], fechaFormateada)
+	// copy(nuevo_mbr.MRBFit[:], fit)
+
+	// // ================================= Escribir el MBR en el archivo
+	// if err := Utilidades.WriteObject(archivo, nuevo_mbr, 0); err != nil {
+	// 	fmt.Fprintln(buffer, "Error: ", err)
+	// 	return
+	// }
+	// defer archivo.Close()
+	// fmt.Fprintln(buffer, "Disco creado con éxito en la path: ", path)
+	// println("Disco creado con éxito en la path: ", path)
 	fmt.Fprintln(buffer, "=-=-=-=-=-=-=FIN MKDISK=-=-=-=-=-=-=")
 }
 
