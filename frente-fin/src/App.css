@@ -1,0 +1,52 @@
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+  gap: 20px; /* Espaciado entre los componentes */
+  font-family: 'Arial', sans-serif; /* Tipografía limpia y moderna */
+}
+
+.text-container {
+  display: flex;
+  flex-direction: column; /* Coloca los contenedores uno arriba del otro */
+  width: 80%; /* Ocupa el 80% del ancho de la pantalla */
+  margin: 0 auto; /* Centra el contenedor horizontalmente */
+  gap: 20px; /* Espaciado entre los cuadros de texto */
+}
+
+textarea.entrada-textarea,
+textarea.salida-textarea {
+  width: 100%; /* Ocupa todo el ancho disponible */
+  height: 300px; /* Ajusta la altura de los cuadros de texto */
+}
+
+.entrada-container,
+.salida-container {
+  width: 100%; /* Ocupa todo el ancho disponible en el contenedor padre */
+}
+
+button {
+  border-radius: 4px; /* Bordes redondeados sutiles */
+  border: none;
+  padding: 10px 20px;
+  background-color: #555; /* Color de fondo del botón */
+  color: white; /* Color del texto en los botones */
+  cursor: pointer;
+  font-size: 16px; /* Tamaño del texto en los botones */
+  transition: background-color 0.3s; /* Transición suave al pasar el mouse */
+}
+
+button:hover {
+  background-color: #666; /* Color de fondo del botón en hover */
+}
+
+.navbar {
+  display: flex;
+  justify-content: center;
+  gap: 10px; /* Espaciado entre los botones */
+}
