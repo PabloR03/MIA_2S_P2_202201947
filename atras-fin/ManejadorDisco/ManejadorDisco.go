@@ -234,6 +234,256 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 	fmt.Println("======FIN DELETE PARTITION======")
 }
 
+func ModifyPartition(path string, name string, add int, unit string, buffer *bytes.Buffer) error {
+	fmt.Println("======Start MODIFY PARTITION======")
+	// if add == 0 {
+	// 	fmt.Fprintf(buffer, "Error FDISK ADD: El tamaño a agregar debe ser mayor que 0.\n")
+	// 	return nil
+	// }
+	// Abrir el archivo binario en la ruta proporcionada
+	file, err := Utilidades.OpenFile(path)
+	if err != nil {
+		fmt.Println("Error: Could not open file at path:", path)
+		return err
+	}
+	defer file.Close()
+
+	// Leer el MBR
+	var TempMBR Estructura.MRB
+	if err := Utilidades.ReadObject(file, &TempMBR, 0); err != nil {
+		fmt.Println("Error: Could not read MBR from file")
+		return err
+	}
+
+	// Imprimir MBR antes de modificar
+	fmt.Println("MBR antes de la modificación:")
+	Estructura.PrintMBR(buffer, TempMBR)
+
+	// Buscar la partición por nombre
+	var foundPartition *Estructura.Partition
+	var partitionType byte
+
+	// Revisar si la partición es primaria o extendida
+	for i := 0; i < 4; i++ {
+		partitionName := strings.TrimRight(string(TempMBR.MRBPartitions[i].PART_Name[:]), "\x00")
+		if partitionName == name {
+			foundPartition = &TempMBR.MRBPartitions[i]
+			partitionType = TempMBR.MRBPartitions[i].PART_Type[0]
+			break
+		}
+	}
+
+	// Si no se encuentra en las primarias/extendidas, buscar en las particiones lógicas
+	if foundPartition == nil {
+		for i := 0; i < 4; i++ {
+			if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' {
+				ebrPos := TempMBR.MRBPartitions[i].PART_Start
+				var ebr Estructura.EBR
+				for {
+					if err := Utilidades.ReadObject(file, &ebr, int64(ebrPos)); err != nil {
+						fmt.Println("Error al leer EBR:", err)
+						return err
+					}
+
+					ebrName := strings.TrimRight(string(ebr.EBRName[:]), "\x00")
+					if ebrName == name {
+						partitionType = 'l' // Partición lógica
+						foundPartition = &Estructura.Partition{
+							PART_Start: ebr.EBRStart,
+							PART_Size:  ebr.EBRSize,
+						}
+						break
+					}
+
+					// Continuar buscando el siguiente EBR
+					if ebr.EBRNext == -1 {
+						break
+					}
+					ebrPos = ebr.EBRNext
+				}
+				if foundPartition != nil {
+					break
+				}
+			}
+		}
+	}
+
+	// Verificar si la partición fue encontrada
+	if foundPartition == nil {
+		fmt.Println("Error: No se encontró la partición con el nombre:", name)
+		return nil // Salir si no se encuentra la partición
+	}
+
+	// Convertir unidades a bytes
+	var addBytes int
+	if unit == "k" {
+		addBytes = add * 1024
+	} else if unit == "m" {
+		addBytes = add * 1024 * 1024
+	} else {
+		fmt.Println("Error: Unidad desconocida, debe ser 'k' o 'm'")
+		return nil // Salir si la unidad no es válida
+	}
+
+	// Flag para saber si continuar o no
+	var shouldModify = true
+
+	// Comprobar si es posible agregar o quitar espacio
+	if add > 0 {
+		// Agregar espacio: verificar si hay suficiente espacio libre después de la partición
+		nextPartitionStart := foundPartition.PART_Start + foundPartition.PART_Size
+		if partitionType == 'l' {
+			// Para particiones lógicas, verificar con el siguiente EBR o el final de la partición extendida
+			for i := 0; i < 4; i++ {
+				if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' {
+					extendedPartitionEnd := TempMBR.MRBPartitions[i].PART_Start + TempMBR.MRBPartitions[i].PART_Size
+					if nextPartitionStart+int32(addBytes) > extendedPartitionEnd {
+						fmt.Println("Error: No hay suficiente espacio libre dentro de la partición extendida")
+						shouldModify = false
+					}
+					break
+				}
+			}
+		} else {
+			// Para primarias o extendidas
+			if nextPartitionStart+int32(addBytes) > TempMBR.MRBSize {
+				fmt.Println("Error: No hay suficiente espacio libre después de la partición")
+				shouldModify = false
+			}
+		}
+	} else {
+		// Quitar espacio: verificar que no se reduzca el tamaño por debajo de 0
+		if foundPartition.PART_Size+int32(addBytes) < 0 {
+			fmt.Println("Error: No es posible reducir la partición por debajo de 0")
+			shouldModify = false
+		}
+	}
+
+	// Solo modificar si no hay errores
+	if shouldModify {
+		foundPartition.PART_Size += int32(addBytes)
+	} else {
+		fmt.Println("No se realizaron modificaciones debido a un error.")
+		return nil // Salir si hubo un error
+	}
+
+	// Si es una partición lógica, sobrescribir el EBR
+	if partitionType == 'l' {
+		ebrPos := foundPartition.PART_Start
+		var ebr Estructura.EBR
+		if err := Utilidades.ReadObject(file, &ebr, int64(ebrPos)); err != nil {
+			fmt.Println("Error al leer EBR:", err)
+			return err
+		}
+
+		// Actualizar el tamaño en el EBR y escribirlo de nuevo
+		ebr.EBRSize = foundPartition.PART_Size
+		if err := Utilidades.WriteObject(file, ebr, int64(ebrPos)); err != nil {
+			fmt.Println("Error al escribir el EBR actualizado:", err)
+			return err
+		}
+
+		// Imprimir el EBR modificado
+		fmt.Println("EBR modificado:")
+		Estructura.PrintEBR(buffer, ebr)
+	}
+
+	// Sobrescribir el MBR actualizado
+	if err := Utilidades.WriteObject(file, TempMBR, 0); err != nil {
+		fmt.Println("Error al escribir el MBR actualizado:", err)
+		return err
+	}
+
+	// Imprimir el MBR modificado
+	fmt.Println("MBR después de la modificación:")
+	Estructura.PrintMBR(buffer, TempMBR)
+
+	fmt.Println("======END MODIFY PARTITION======")
+	return nil
+}
+
+func Unmount(id string, buffer *bytes.Buffer) {
+	fmt.Fprintf(buffer, "Desmontando partición con ID:"+id)
+
+	// Buscar la partición montada por ID
+	var partitionFound *PartitionMounted
+	var diskID string
+	var partitionIndex int
+
+	for disk, partitions := range mountedPartitions {
+		for i, partition := range partitions {
+			if partition.ID == id {
+				partitionFound = &partitions[i]
+				diskID = disk
+				partitionIndex = i
+				break
+			}
+		}
+		if partitionFound != nil {
+			break
+		}
+	}
+
+	// Si no se encuentra la partición, mostrar un error
+	if partitionFound == nil {
+		fmt.Println("Error: No se encontró una partición montada con el ID proporcionado:", id)
+		return
+	}
+
+	// Abrir el archivo del disco correspondiente
+	file, err := Utilidades.OpenFile(partitionFound.Path)
+	if err != nil {
+		fmt.Println("Error: No se pudo abrir el archivo en la ruta:", partitionFound.Path)
+		return
+	}
+	defer file.Close()
+
+	// Leer el MBR
+	var TempMBR Estructura.MRB
+	if err := Utilidades.ReadObject(file, &TempMBR, 0); err != nil {
+		fmt.Println("Error: No se pudo leer el MBR desde el archivo")
+		return
+	}
+
+	// Buscar la partición en el MBR utilizando el nombre
+	nameBytes := [16]byte{}
+	copy(nameBytes[:], []byte(partitionFound.Name))
+	partitionUpdated := false
+
+	for i := 0; i < 4; i++ {
+		if bytes.Equal(TempMBR.MRBPartitions[i].PART_Name[:], nameBytes[:]) {
+			// Cambiar el estado de la partición de montada ('1') a desmontada ('0')
+			TempMBR.MRBPartitions[i].PART_Status[0] = '0'
+			// Borrar el ID de la partición
+			copy(TempMBR.MRBPartitions[i].PART_Id[:], "")
+			partitionUpdated = true
+			break
+		}
+	}
+
+	if !partitionUpdated {
+		fmt.Println("Error: No se pudo encontrar la partición en el MBR para desmontar")
+		return
+	}
+
+	// Sobrescribir el MBR actualizado al archivo
+	if err := Utilidades.WriteObject(file, TempMBR, 0); err != nil {
+		fmt.Println("Error: No se pudo sobrescribir el MBR en el archivo")
+		return
+	}
+
+	// Eliminar la partición de la lista de particiones montadas
+	mountedPartitions[diskID] = append(mountedPartitions[diskID][:partitionIndex], mountedPartitions[diskID][partitionIndex+1:]...)
+
+	// Si ya no hay particiones montadas en este disco, eliminar el disco de la lista
+	if len(mountedPartitions[diskID]) == 0 {
+		delete(mountedPartitions, diskID)
+	}
+
+	fmt.Println("Partición desmontada con éxito.")
+	PrintMountedPartitions(buffer) // Mostrar las particiones montadas restantes
+}
+
 // Funcion para eliminar una particion montada
 func EliminarDiscoPorRuta(ruta string, buffer *bytes.Buffer) {
 	discoID := generateDiskID(ruta)

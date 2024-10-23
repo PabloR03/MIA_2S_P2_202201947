@@ -9,15 +9,13 @@ style="rounded,filled";
 color=lightgrey;
 node [style=filled, color=white];
 MBR [label="MBR"];
-P1 [label="{Partición 1|12.00%}"];
+P1 [label="{Partición 1|33.33%}"];
 MBR -> P1 [style=invis];
-P2 [label="{Partición 2|10.00%}"];
+P2 [label="{Partición 2|15.00%}"];
 P1 -> P2 [style=invis];
-P3 [label="{Partición 3|10.00%}"];
+P3 [label="{Partición 3|48.33%}"];
 P2 -> P3 [style=invis];
-P4 [label="{Extendida|25.00%}|{{EBR|{Lógica 1|4.00%}}|{EBR|{Lógica 2|0.00%}}|{Libre en Ext|21.00%}}"];
+P4 [label="{Extendida|16.67%}|{{EBR|{Lógica 1|0.00%}}|{Libre en Ext|16.67%}}"];
 P3 -> P4 [style=invis];
-FreeSpace [label="{Libre|39.00%}"];
-P4 -> FreeSpace [style=invis];
 }
 }

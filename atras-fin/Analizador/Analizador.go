@@ -45,6 +45,8 @@ func AnalyzeCommnad(command string, params string, buffer *bytes.Buffer) {
 		Funcion_mkdisk(params, buffer)
 	} else if strings.Contains(command, "fdisk") {
 		Funcion_fdisk(params, buffer)
+	} else if strings.Contains(command, "unmount") {
+		Funcion_unmount(params, buffer)
 	} else if strings.Contains(command, "rmdisk") {
 		Funcion_rmdisk(params, buffer)
 	} else if strings.Contains(command, "mount") {
@@ -143,6 +145,32 @@ func Funcion_rmdisk(params string, writer io.Writer) {
 	ManejadorDisco.Rmdisk(*path, writer.(*bytes.Buffer))
 }
 
+func Funcion_unmount(params string, writer io.Writer) {
+	// Definir flags
+	fs := flag.NewFlagSet("unmount", flag.ExitOnError)
+	id := fs.String("id", "", "ID de la partición a desmontar")
+
+	// Parsear los parámetros del input
+	matches := re.FindAllStringSubmatch(params, -1)
+
+	// Procesar los parámetros
+	for _, match := range matches {
+		flagName := match[1]
+		flagValue := strings.ToLower(match[2]) // Convertir a minúsculas
+		flagValue = strings.Trim(flagValue, "\"")
+		fs.Set(flagName, flagValue)
+	}
+
+	// Validaciones
+	if *id == "" {
+		fmt.Println("Error: ID es obligatorio")
+		return
+	}
+
+	// Llamar a la función Unmount con el ID
+	ManejadorDisco.Unmount(*id, writer.(*bytes.Buffer))
+}
+
 // ya revisado
 func Funcion_fdisk(input string, writer io.Writer) {
 	fs := flag.NewFlagSet("fdisk", flag.ExitOnError)
@@ -152,6 +180,7 @@ func Funcion_fdisk(input string, writer io.Writer) {
 	type_ := fs.String("type", "p", "Tipo")
 	fit := fs.String("fit", "wf", "Ajuste")
 	delete_ := fs.String("delete", "", "Eliminar")
+	add := fs.String("add", "", "Agregar")
 	name := fs.String("name", "", "Nombre")
 	//add := fs.String("add", "", "Agregar")
 
@@ -185,6 +214,24 @@ func Funcion_fdisk(input string, writer io.Writer) {
 		}
 		// Llamar a la función que elimina la partición
 		ManejadorDisco.DeletePartition(*path, *name, *delete_, writer.(*bytes.Buffer))
+		return
+	}
+
+	// Validaciones para la opción -add
+	// func ModifyPartition(path string, name string, add int, unit string) error {
+	if *add != "" {
+		var Add int
+		Add, err := strconv.Atoi(*add)
+		if err != nil {
+			fmt.Fprintf(writer, "Error: El valor de 'add' debe ser un número entero")
+			return
+		}
+		if *path == "" || *name == "" {
+			fmt.Println("Error: Para agregar espacio a una partición, se requiere 'path' y 'name'.")
+			return
+		}
+		// Llamar a la función que agrega espacio a la partición
+		ManejadorDisco.ModifyPartition(*path, *name, Add, *unit, writer.(*bytes.Buffer))
 		return
 	}
 
