@@ -48,22 +48,22 @@ func PrintMountedPartitions(buffer *bytes.Buffer) {
 
 // Función para eliminar particiones
 func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buffer) {
-	fmt.Println("======Start DELETE PARTITION======")
-	fmt.Println("Path:", path)
-	fmt.Println("Name:", name)
-	fmt.Println("Delete type:", delete_)
+	fmt.Fprintf(buffer, "======Start DELETE PARTITION======")
+	fmt.Fprintf(buffer, "Path:"+path)
+	fmt.Fprintf(buffer, "Name:"+name)
+	fmt.Fprintf(buffer, "Delete type:"+delete_)
 
 	// Abrir el archivo binario en la ruta proporcionada
 	file, err := Utilidades.OpenFile(path)
 	if err != nil {
-		fmt.Println("Error: Could not open file at path:", path)
+		fmt.Fprintf(buffer, "Error: Could not open file at path:"+path)
 		return
 	}
 
 	var TempMBR Estructura.MRB
 	// Leer el objeto desde el archivo binario
 	if err := Utilidades.ReadObject(file, &TempMBR, 0); err != nil {
-		fmt.Println("Error: Could not read MBR from file")
+		fmt.Fprintf(buffer, "Error: Could not read MBR from file")
 		return
 	}
 
@@ -77,22 +77,22 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 
 			// Si es una partición extendida, eliminar las particiones lógicas dentro de ella
 			if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' {
-				fmt.Println("Eliminando particiones lógicas dentro de la partición extendida...")
+				fmt.Fprintf(buffer, "Eliminando particiones lógicas dentro de la partición extendida...")
 				ebrPos := TempMBR.MRBPartitions[i].PART_Start
 				var ebr Estructura.EBR
 				for {
 					err := Utilidades.ReadObject(file, &ebr, int64(ebrPos))
 					if err != nil {
-						fmt.Println("Error al leer EBR:", err)
+						fmt.Print(buffer, "Error al leer EBR:", err)
 						break
 					}
 					// Detener el bucle si el EBR está vacío
 					if ebr.EBRStart == 0 && ebr.EBRSize == 0 {
-						fmt.Println("EBR vacío encontrado, deteniendo la búsqueda.")
+						fmt.Fprintf(buffer, "EBR vacío encontrado, deteniendo la búsqueda.")
 						break
 					}
 					// Depuración: Mostrar el EBR leído
-					fmt.Println("EBR leído antes de eliminar:")
+					fmt.Fprintf(buffer, "EBR leído antes de eliminar:")
 					Estructura.PrintEBR(buffer, ebr)
 
 					// Eliminar partición lógica
@@ -106,7 +106,7 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 					}
 
 					// Depuración: Mostrar el EBR después de eliminar
-					fmt.Println("EBR después de eliminar:")
+					fmt.Fprintf(buffer, "EBR después de eliminar:")
 					Estructura.PrintEBR(buffer, ebr)
 
 					if ebr.EBRNext == -1 {
@@ -120,7 +120,7 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 			if delete_ == "fast" {
 				// Eliminar rápido: Resetear manualmente los campos de la partición
 				TempMBR.MRBPartitions[i] = Estructura.Partition{} // Resetear la partición manualmente
-				fmt.Println("Partición eliminada en modo Fast.")
+				fmt.Fprintf(buffer, "Partición eliminada en modo Fast.")
 			} else if delete_ == "full" {
 				// Eliminar completamente: Resetear manualmente y sobrescribir con '\0'
 				start := TempMBR.MRBPartitions[i].PART_Start
@@ -128,7 +128,7 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 				TempMBR.MRBPartitions[i] = Estructura.Partition{} // Resetear la partición manualmente
 				// Escribir '\0' en el espacio de la partición en el disco
 				Utilidades.FillWithZeros(file, start, size)
-				fmt.Println("Partición eliminada en modo Full.")
+				fmt.Fprintf(buffer, "Partición eliminada en modo Full.")
 
 				// Leer y verificar si el área está llena de ceros
 				Utilidades.VerifyZeros(file, start, size)
@@ -139,7 +139,7 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 
 	if !found {
 		// Buscar particiones lógicas si no se encontró en el MBR
-		fmt.Println("Buscando en particiones lógicas dentro de las extendidas...")
+		fmt.Fprintf(buffer, "Buscando en particiones lógicas dentro de las extendidas...")
 		for i := 0; i < 4; i++ {
 			if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' { // Solo buscar dentro de particiones extendidas
 				ebrPos := TempMBR.MRBPartitions[i].PART_Start
@@ -147,12 +147,12 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 				for {
 					err := Utilidades.ReadObject(file, &ebr, int64(ebrPos))
 					if err != nil {
-						fmt.Println("Error al leer EBR:", err)
+						fmt.Print(buffer, "Error al leer EBR:", err)
 						break
 					}
 
 					// Depuración: Mostrar el EBR leído
-					fmt.Println("EBR leído:")
+					fmt.Fprintf(buffer, "EBR leído:")
 					Estructura.PrintEBR(buffer, ebr)
 
 					logicalName := strings.TrimRight(string(ebr.EBRName[:]), "\x00")
@@ -162,13 +162,13 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 						if delete_ == "fast" {
 							ebr = Estructura.EBR{}                           // Resetear el EBR manualmente
 							Utilidades.WriteObject(file, ebr, int64(ebrPos)) // Sobrescribir el EBR reseteado
-							fmt.Println("Partición lógica eliminada en modo Fast.")
+							fmt.Fprintf(buffer, "Partición lógica eliminada en modo Fast.")
 						} else if delete_ == "full" {
 							Utilidades.FillWithZeros(file, ebr.EBRStart, ebr.EBRSize)
 							ebr = Estructura.EBR{}                           // Resetear el EBR manualmente
 							Utilidades.WriteObject(file, ebr, int64(ebrPos)) // Sobrescribir el EBR reseteado
 							Utilidades.VerifyZeros(file, ebr.EBRStart, ebr.EBRSize)
-							fmt.Println("Partición lógica eliminada en modo Full.")
+							fmt.Fprintf(buffer, "Partición lógica eliminada en modo Full.")
 						}
 						break
 					}
@@ -186,39 +186,39 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 	}
 
 	if !found {
-		fmt.Println("Error: No se encontró la partición con el nombre:", name)
+		fmt.Print(buffer, "Error: No se encontró la partición con el nombre:", name)
 		return
 	}
 
 	// Sobrescribir el MBR
 	if err := Utilidades.WriteObject(file, TempMBR, 0); err != nil {
-		fmt.Println("Error: Could not write MBR to file")
+		fmt.Fprintf(buffer, "Error: Could not write MBR to file")
 		return
 	}
 
 	// Leer el MBR actualizado y mostrarlo
-	fmt.Println("MBR actualizado después de la eliminación:")
+	fmt.Fprintf(buffer, "MBR actualizado después de la eliminación:")
 	Estructura.PrintMBR(buffer, TempMBR)
 
 	// Si es una partición extendida, mostrar los EBRs actualizados
 	for i := 0; i < 4; i++ {
 		if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' {
-			fmt.Println("Imprimiendo EBRs actualizados en la partición extendida:")
+			fmt.Fprintf(buffer, "Imprimiendo EBRs actualizados en la partición extendida:")
 			ebrPos := TempMBR.MRBPartitions[i].PART_Start
 			var ebr Estructura.EBR
 			for {
 				err := Utilidades.ReadObject(file, &ebr, int64(ebrPos))
 				if err != nil {
-					fmt.Println("Error al leer EBR:", err)
+					fmt.Print(buffer, "Error al leer EBR:", err)
 					break
 				}
 				// Detener el bucle si el EBR está vacío
 				if ebr.EBRStart == 0 && ebr.EBRSize == 0 {
-					fmt.Println("EBR vacío encontrado, deteniendo la búsqueda.")
+					fmt.Fprintf(buffer, "EBR vacío encontrado, deteniendo la búsqueda.")
 					break
 				}
 				// Depuración: Imprimir cada EBR leído
-				fmt.Println("EBR leído después de actualización:")
+				fmt.Fprintf(buffer, "EBR leído después de actualización:")
 				Estructura.PrintEBR(buffer, ebr)
 				if ebr.EBRNext == -1 {
 					break
@@ -231,19 +231,19 @@ func DeletePartition(path string, name string, delete_ string, buffer *bytes.Buf
 	// Cerrar el archivo binario
 	defer file.Close()
 
-	fmt.Println("======FIN DELETE PARTITION======")
+	fmt.Fprintf(buffer, "======FIN DELETE PARTITION======")
 }
 
 func ModifyPartition(path string, name string, add int, unit string, buffer *bytes.Buffer) error {
-	fmt.Println("======Start MODIFY PARTITION======")
-	// if add == 0 {
-	// 	fmt.Fprintf(buffer, "Error FDISK ADD: El tamaño a agregar debe ser mayor que 0.\n")
-	// 	return nil
-	// }
+	fmt.Fprintf(buffer, "======Start MODIFY PARTITION======")
+	if add == 0 {
+		fmt.Fprintf(buffer, "Error FDISK ADD: El tamaño a agregar debe ser distinto que 0.\n")
+		return nil
+	}
 	// Abrir el archivo binario en la ruta proporcionada
 	file, err := Utilidades.OpenFile(path)
 	if err != nil {
-		fmt.Println("Error: Could not open file at path:", path)
+		fmt.Fprintf(buffer, "Error: Could not open file at path:"+path)
 		return err
 	}
 	defer file.Close()
@@ -251,12 +251,12 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 	// Leer el MBR
 	var TempMBR Estructura.MRB
 	if err := Utilidades.ReadObject(file, &TempMBR, 0); err != nil {
-		fmt.Println("Error: Could not read MBR from file")
+		fmt.Fprintf(buffer, "Error: Could not read MBR from file")
 		return err
 	}
 
 	// Imprimir MBR antes de modificar
-	fmt.Println("MBR antes de la modificación:")
+	fmt.Fprintf(buffer, "MBR antes de la modificación:")
 	Estructura.PrintMBR(buffer, TempMBR)
 
 	// Buscar la partición por nombre
@@ -281,7 +281,7 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 				var ebr Estructura.EBR
 				for {
 					if err := Utilidades.ReadObject(file, &ebr, int64(ebrPos)); err != nil {
-						fmt.Println("Error al leer EBR:", err)
+						fmt.Fprintf(buffer, "Error al leer EBR: %v", err)
 						return err
 					}
 
@@ -310,7 +310,7 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 
 	// Verificar si la partición fue encontrada
 	if foundPartition == nil {
-		fmt.Println("Error: No se encontró la partición con el nombre:", name)
+		fmt.Fprintf(buffer, "Error: No se encontró la partición con el nombre:"+name)
 		return nil // Salir si no se encuentra la partición
 	}
 
@@ -321,7 +321,7 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 	} else if unit == "m" {
 		addBytes = add * 1024 * 1024
 	} else {
-		fmt.Println("Error: Unidad desconocida, debe ser 'k' o 'm'")
+		fmt.Fprintf(buffer, "Error: Unidad desconocida, debe ser 'k' o 'm'")
 		return nil // Salir si la unidad no es válida
 	}
 
@@ -338,7 +338,7 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 				if TempMBR.MRBPartitions[i].PART_Type[0] == 'e' {
 					extendedPartitionEnd := TempMBR.MRBPartitions[i].PART_Start + TempMBR.MRBPartitions[i].PART_Size
 					if nextPartitionStart+int32(addBytes) > extendedPartitionEnd {
-						fmt.Println("Error: No hay suficiente espacio libre dentro de la partición extendida")
+						fmt.Fprintf(buffer, "Error: No hay suficiente espacio libre dentro de la partición extendida")
 						shouldModify = false
 					}
 					break
@@ -347,14 +347,14 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 		} else {
 			// Para primarias o extendidas
 			if nextPartitionStart+int32(addBytes) > TempMBR.MRBSize {
-				fmt.Println("Error: No hay suficiente espacio libre después de la partición")
+				fmt.Fprintf(buffer, "Error: No hay suficiente espacio libre después de la partición")
 				shouldModify = false
 			}
 		}
 	} else {
 		// Quitar espacio: verificar que no se reduzca el tamaño por debajo de 0
 		if foundPartition.PART_Size+int32(addBytes) < 0 {
-			fmt.Println("Error: No es posible reducir la partición por debajo de 0")
+			fmt.Fprintf(buffer, "Error: No es posible reducir la partición por debajo de 0")
 			shouldModify = false
 		}
 	}
@@ -363,7 +363,7 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 	if shouldModify {
 		foundPartition.PART_Size += int32(addBytes)
 	} else {
-		fmt.Println("No se realizaron modificaciones debido a un error.")
+		fmt.Fprintf(buffer, "No se realizaron modificaciones debido a un error.")
 		return nil // Salir si hubo un error
 	}
 
@@ -372,33 +372,33 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 		ebrPos := foundPartition.PART_Start
 		var ebr Estructura.EBR
 		if err := Utilidades.ReadObject(file, &ebr, int64(ebrPos)); err != nil {
-			fmt.Println("Error al leer EBR:", err)
+			fmt.Fprintf(buffer, "Error al leer EBR: %v", err)
 			return err
 		}
 
 		// Actualizar el tamaño en el EBR y escribirlo de nuevo
 		ebr.EBRSize = foundPartition.PART_Size
 		if err := Utilidades.WriteObject(file, ebr, int64(ebrPos)); err != nil {
-			fmt.Println("Error al escribir el EBR actualizado:", err)
+			fmt.Fprintf(buffer, "Error al escribir el EBR actualizado: %v", err)
 			return err
 		}
 
 		// Imprimir el EBR modificado
-		fmt.Println("EBR modificado:")
+		fmt.Fprintf(buffer, "EBR modificado:")
 		Estructura.PrintEBR(buffer, ebr)
 	}
 
 	// Sobrescribir el MBR actualizado
 	if err := Utilidades.WriteObject(file, TempMBR, 0); err != nil {
-		fmt.Println("Error al escribir el MBR actualizado:", err)
+		fmt.Println(buffer, "Error al escribir el MBR actualizado: %v", err)
 		return err
 	}
 
 	// Imprimir el MBR modificado
-	fmt.Println("MBR después de la modificación:")
+	fmt.Fprintf(buffer, "MBR después de la modificación:")
 	Estructura.PrintMBR(buffer, TempMBR)
 
-	fmt.Println("======END MODIFY PARTITION======")
+	fmt.Fprintf(buffer, "======END MODIFY PARTITION======")
 	return nil
 }
 
@@ -426,14 +426,14 @@ func Unmount(id string, buffer *bytes.Buffer) {
 
 	// Si no se encuentra la partición, mostrar un error
 	if partitionFound == nil {
-		fmt.Println("Error: No se encontró una partición montada con el ID proporcionado:", id)
+		fmt.Fprintf(buffer, "Error: No se encontró una partición montada con el ID proporcionado:"+id)
 		return
 	}
 
 	// Abrir el archivo del disco correspondiente
 	file, err := Utilidades.OpenFile(partitionFound.Path)
 	if err != nil {
-		fmt.Println("Error: No se pudo abrir el archivo en la ruta:", partitionFound.Path)
+		fmt.Fprintf(buffer, "Error: No se pudo abrir el archivo en la ruta:"+partitionFound.Path)
 		return
 	}
 	defer file.Close()
@@ -441,7 +441,7 @@ func Unmount(id string, buffer *bytes.Buffer) {
 	// Leer el MBR
 	var TempMBR Estructura.MRB
 	if err := Utilidades.ReadObject(file, &TempMBR, 0); err != nil {
-		fmt.Println("Error: No se pudo leer el MBR desde el archivo")
+		fmt.Fprintf(buffer, "Error: No se pudo leer el MBR desde el archivo")
 		return
 	}
 
@@ -462,13 +462,13 @@ func Unmount(id string, buffer *bytes.Buffer) {
 	}
 
 	if !partitionUpdated {
-		fmt.Println("Error: No se pudo encontrar la partición en el MBR para desmontar")
+		fmt.Fprintf(buffer, "Error: No se pudo encontrar la partición en el MBR para desmontar")
 		return
 	}
 
 	// Sobrescribir el MBR actualizado al archivo
 	if err := Utilidades.WriteObject(file, TempMBR, 0); err != nil {
-		fmt.Println("Error: No se pudo sobrescribir el MBR en el archivo")
+		fmt.Fprintf(buffer, "Error: No se pudo sobrescribir el MBR en el archivo")
 		return
 	}
 
@@ -480,7 +480,7 @@ func Unmount(id string, buffer *bytes.Buffer) {
 		delete(mountedPartitions, diskID)
 	}
 
-	fmt.Println("Partición desmontada con éxito.")
+	fmt.Fprintf(buffer, "Partición desmontada con éxito.")
 	PrintMountedPartitions(buffer) // Mostrar las particiones montadas restantes
 }
 
@@ -548,26 +548,26 @@ func Mkdisk(size int, fit string, unit string, path string, buffer *bytes.Buffer
 
 	// Validar fit bf/ff/wf
 	if fit != "bf" && fit != "wf" && fit != "ff" {
-		fmt.Println("Error: Fit debe ser bf, wf o ff")
+		fmt.Fprintf(buffer, "Error: Fit debe ser bf, wf o ff")
 		return
 	}
 
 	// Validar size > 0
 	if size <= 0 {
-		fmt.Println("Error: Size debe ser mayor a 0")
+		fmt.Fprintf(buffer, "Error: Size debe ser mayor a 0")
 		return
 	}
 
 	// Validar unit k - m
 	if unit != "k" && unit != "m" {
-		fmt.Println("Error: Las unidades válidas son k o m")
+		fmt.Fprintf(buffer, "Error: Las unidades válidas son k o m")
 		return
 	}
 
 	// Crear el archivo
 	err := Utilidades.CreateFile(path)
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Print(buffer, "Error:", err)
 		return
 	}
 
@@ -597,7 +597,7 @@ func Mkdisk(size int, fit string, unit string, path string, buffer *bytes.Buffer
 		}
 		_, err := file.Write(zeroBlock)
 		if err != nil {
-			fmt.Println("Error escribiendo ceros:", err)
+			fmt.Print(buffer, "Error escribiendo ceros:", err)
 			return
 		}
 		remainingSize -= blockSize
@@ -923,7 +923,7 @@ func Fdisk(size int, path string, name string, unit string, type_ string, fit st
 			return
 		}
 		fmt.Fprintf(buffer, "Partición lógica creada exitosamente en la path: %s con el name: %s.", path, name)
-		fmt.Println("---------------------------------------------")
+		fmt.Fprintf(buffer, "---------------------------------------------")
 		EBRActual := ParticionExtendida.PART_Start
 		for {
 			var EBRTemp Estructura.EBR
@@ -937,7 +937,7 @@ func Fdisk(size int, path string, name string, unit string, type_ string, fit st
 			}
 			EBRActual = EBRTemp.EBRNext
 		}
-		fmt.Println("---------------------------------------------")
+		fmt.Fprintf(buffer, "---------------------------------------------")
 	}
 	if err := Utilidades.WriteObject(archivo, MBRTemporal, 0); err != nil {
 		return
@@ -946,14 +946,14 @@ func Fdisk(size int, path string, name string, unit string, type_ string, fit st
 	if err := Utilidades.ReadObject(archivo, &TempMRB, 0); err != nil {
 		return
 	}
-	fmt.Println("---------------------------------------------")
+	fmt.Fprintf(buffer, "---------------------------------------------")
 	Estructura.PrintMBRnormal(TempMRB)
 	Estructura.PrintMBR(buffer, TempMRB)
-	fmt.Println("---------------------------------------------")
+	fmt.Fprintf(buffer, "---------------------------------------------")
 	defer archivo.Close()
 
 	fmt.Fprintln(buffer, "=-=-=-=-=-=-=FIN FDISK=-=-=-=-=-=-=")
-	fmt.Println("")
+	fmt.Fprintf(buffer, "")
 }
 
 // YA REVISADO
@@ -1052,29 +1052,29 @@ func Mount(path string, name string, buffer *bytes.Buffer) {
 
 	// Escribir el MBR actualizado al archivo
 	if err := Utilidades.WriteObject(file, TempMBR, 0); err != nil {
-		fmt.Println("Error: No se pudo sobrescribir el MBR en el archivo")
+		fmt.Fprintf(buffer, "Error: No se pudo sobrescribir el MBR en el archivo")
 		fmt.Fprintln(buffer, "=-=-=-=-=-=-=FIN MOUNT=-=-=-=-=-=-=")
 		return
 	}
 
 	fmt.Fprintf(buffer, "Partición montada con ID: %s", partitionID)
 
-	fmt.Println("")
+	fmt.Fprintf(buffer, "")
 	// Imprimir el MBR actualizado
-	fmt.Println("MBR actualizado:")
+	fmt.Fprintf(buffer, "MBR actualizado:")
 	Estructura.PrintMBRnormal(TempMBR)
 	Estructura.PrintMBR(buffer, TempMBR)
-	fmt.Println("")
+	fmt.Fprintf(buffer, "")
 
 	// Imprimir las particiones montadas (solo estan mientras dure la sesion de la consola)
 
-	fmt.Println("REVISION DE PARTICIONES MONTADAS")
-	fmt.Println("")
-	fmt.Println("")
+	fmt.Fprintf(buffer, "REVISION DE PARTICIONES MONTADAS")
+	fmt.Fprintf(buffer, "")
+	fmt.Fprintf(buffer, "")
 	//PrintMountedPartitions()
-	fmt.Println("")
-	fmt.Println("")
-	fmt.Println("FIN DE REVISION DE PARTICIONES MONTADAS")
+	fmt.Fprintf(buffer, "")
+	fmt.Fprintf(buffer, "")
+	fmt.Fprintf(buffer, "FIN DE REVISION DE PARTICIONES MONTADAS")
 
 	fmt.Fprintln(buffer, "=-=-=-=-=-=-=FIN MOUNT=-=-=-=-=-=-=")
 }

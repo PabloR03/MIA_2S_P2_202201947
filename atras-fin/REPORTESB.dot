@@ -1,0 +1,28 @@
+digraph G {
+node [shape=plaintext];
+fontname="Helvetica,Arial,sans-serif";
+bgcolor="#F0F8FF";
+title [label="REPORTE SB", fontsize=20, fontcolor="#4B0082"];
+SBTable [label=<
+<table border='0' cellborder='1' cellspacing='0' cellpadding='8'>
+<tr><td bgcolor="#4169E1" colspan='2'><font color="white"><b>Super Bloque</b></font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB FileSystem Type</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">2</font></td></tr>
+<tr><td bgcolor="#FFFFFF"><font color="#333333">SB Inodes Count</font></td><td bgcolor="#FFFFFF"><font color="#0000CD">1795</font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB Blocks Count</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">5385</font></td></tr>
+<tr><td bgcolor="#FFFFFF"><font color="#333333">SB Free Blocks Count</font></td><td bgcolor="#FFFFFF"><font color="#0000CD">5383</font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB Free Inodes Count</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">1793</font></td></tr>
+<tr><td bgcolor="#FFFFFF"><font color="#333333">SB Mtime</font></td><td bgcolor="#FFFFFF"><font color="#0000CD">23-10-2024 18:19:</font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB Umtime</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">23-10-2024 18:19:</font></td></tr>
+<tr><td bgcolor="#FFFFFF"><font color="#333333">SB Mnt Count</font></td><td bgcolor="#FFFFFF"><font color="#0000CD">1</font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB Magic</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">61267</font></td></tr>
+<tr><td bgcolor="#FFFFFF"><font color="#333333">SB Inode Size</font></td><td bgcolor="#FFFFFF"><font color="#0000CD">127</font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB Block Size</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">64</font></td></tr>
+<tr><td bgcolor="#FFFFFF"><font color="#333333">SB First Inode</font></td><td bgcolor="#FFFFFF"><font color="#0000CD">0</font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB First Block</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">0</font></td></tr>
+<tr><td bgcolor="#FFFFFF"><font color="#333333">SB Bm Inode Start</font></td><td bgcolor="#FFFFFF"><font color="#0000CD">657</font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB Bm Block Start</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">2452</font></td></tr>
+<tr><td bgcolor="#FFFFFF"><font color="#333333">SB Inode Start</font></td><td bgcolor="#FFFFFF"><font color="#0000CD">7837</font></td></tr>
+<tr><td bgcolor="#E6F3FF"><font color="#333333">SB Block Start</font></td><td bgcolor="#E6F3FF"><font color="#0000CD">235802</font></td></tr>
+</table>
+>];
+}

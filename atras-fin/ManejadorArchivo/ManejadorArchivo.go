@@ -16,8 +16,18 @@ import (
 )
 
 // YA REVISADO
-func Mkfs(id string, type_ string, buffer *bytes.Buffer) {
+func Mkfs(id string, type_ string, syste string, buffer *bytes.Buffer) {
 	fmt.Fprintf(buffer, "MKFS---------------------------------------------------------------------\n")
+
+	if type_ == "" {
+		fmt.Fprintf(buffer, "Error MKFS: El comando MKFS no recibe parámetros.\n")
+		return
+	}
+
+	if syste == "" {
+		fmt.Fprintf(buffer, "Error MKFS: No se ha seleccionado un sistema de archivos.\n")
+		return
+	}
 
 	var ParticionesMontadas ManejadorDisco.PartitionMounted
 	var ParticionEncontrada bool
@@ -72,7 +82,18 @@ func Mkfs(id string, type_ string, buffer *bytes.Buffer) {
 
 	numerador := int32(MBRTemporal.MRBPartitions[IndiceParticion].PART_Size - int32(binary.Size(Estructura.SuperBlock{})))
 	denrominador_base := int32(4 + int32(binary.Size(Estructura.Inode{})) + 3*int32(binary.Size(Estructura.FileBlock{})))
-	denrominador := denrominador_base
+	var temp int32 = 0
+
+	// Agregar journaling si es EXT3
+	if syste == "3fs" {
+		temp = int32(binary.Size(Estructura.Journaling{})) // Añadir journaling para EXT3
+	} else if syste == "2fs" {
+		temp = 0 // Sin journaling para EXT2
+	} else {
+		fmt.Println("Error: Sólo están disponibles los sistemas de archivos 2FS y 3FS.")
+		return
+	}
+	denrominador := denrominador_base + temp
 	n := int32(numerador / denrominador)
 
 	// Crear el Superbloque
@@ -96,9 +117,14 @@ func Mkfs(id string, type_ string, buffer *bytes.Buffer) {
 	NuevoSuperBloque.S_BM_Block_Start = NuevoSuperBloque.S_BM_Inode_Start + n
 	NuevoSuperBloque.S_Inode_Start = NuevoSuperBloque.S_BM_Block_Start + 3*n
 	NuevoSuperBloque.S_Block_Start = NuevoSuperBloque.S_Inode_Start + n*int32(binary.Size(Estructura.Inode{}))
-	// Escribir el superbloque en el archivo
-	SistemaEXT2(n, MBRTemporal.MRBPartitions[IndiceParticion], NuevoSuperBloque, FechaString, archivo, buffer)
-	defer archivo.Close()
+
+	if syste == "2fs" {
+		SistemaEXT2(n, MBRTemporal.MRBPartitions[IndiceParticion], NuevoSuperBloque, FechaString, archivo, buffer)
+	} else if syste == "3fs" {
+		SistemaEXT3(n, MBRTemporal.MRBPartitions[IndiceParticion], NuevoSuperBloque, FechaString, archivo, buffer)
+		// Escribir el superbloque en el archivo
+		defer archivo.Close()
+	}
 }
 
 func SistemaEXT2(n int32, Particion Estructura.Partition, NuevoSuperBloque Estructura.SuperBlock, Fecha string, archivo *os.File, buffer *bytes.Buffer) {
@@ -138,6 +164,101 @@ func SistemaEXT2(n int32, Particion Estructura.Partition, NuevoSuperBloque Estru
 	Estructura.PrintSuperBlock(buffer, NuevoSuperBloque)
 	fmt.Fprintf(buffer, "Partición: %s formateada exitosamente.\n", string(Particion.PART_Name[:]))
 
+}
+
+func SistemaEXT3(n int32, partition Estructura.Partition, newSuperblock Estructura.SuperBlock, date string, file *os.File, buffer *bytes.Buffer) {
+	fmt.Println("======Start CREATE EXT3======")
+	fmt.Println("INODOS:", n)
+
+	// Imprimir Superblock inicial
+	Estructura.PrintSuperBlock(buffer, newSuperblock)
+	fmt.Println("Date:", date)
+
+	// Inicializa el journaling
+	if err := initJournaling(newSuperblock, file); err != nil {
+		fmt.Println("Error al inicializar el Journaling: ", err)
+		return
+	}
+	fmt.Println("Journaling inicializado correctamente.")
+
+	// Escribe los bitmaps de inodos y bloques en el archivo
+	for i := int32(0); i < n; i++ {
+		if err := Utilidades.WriteObject(file, byte(0), int64(newSuperblock.S_BM_Inode_Start+i)); err != nil {
+			fmt.Println("Error: ", err)
+			return
+		}
+	}
+	fmt.Println("Bitmap de inodos escrito correctamente.")
+
+	for i := int32(0); i < 3*n; i++ {
+		if err := Utilidades.WriteObject(file, byte(0), int64(newSuperblock.S_BM_Block_Start+i)); err != nil {
+			fmt.Println("Error: ", err)
+			return
+		}
+	}
+	fmt.Println("Bitmap de bloques escrito correctamente.")
+
+	// Inicializa inodos y bloques con valores predeterminados
+	if err := initInodesAndBlocks(n, newSuperblock, file); err != nil {
+		fmt.Println("Error: ", err)
+		return
+	}
+	fmt.Println("Inodos y bloques inicializados correctamente.")
+
+	// Crea la carpeta raíz y el archivo users.txt
+	if err := createRootAndUsersFile(newSuperblock, date, file); err != nil {
+		fmt.Println("Error: ", err)
+		return
+	}
+	fmt.Println("Carpeta raíz y archivo users.txt creados correctamente.")
+
+	// Escribe el superbloque actualizado al archivo
+	if err := Utilidades.WriteObject(file, newSuperblock, int64(partition.PART_Start)); err != nil {
+		fmt.Println("Error: ", err)
+		return
+	}
+	fmt.Println("Superbloque escrito correctamente.")
+
+	// Marca los primeros inodos y bloques como usados
+	if err := markUsedInodesAndBlocks(newSuperblock, file); err != nil {
+		fmt.Println("Error: ", err)
+		return
+	}
+	fmt.Println("Inodos y bloques iniciales marcados como usados correctamente.")
+
+	// Imprimir Fileblocks (similar a EXT2 para verificación)
+	for i := int32(0); i < 1; i++ {
+		var fileblock Estructura.FileBlock
+		offset := int64(newSuperblock.S_Block_Start + int32(binary.Size(Estructura.FolderBlock{})) + i*int32(binary.Size(Estructura.FileBlock{})))
+		if err := Utilidades.ReadObject(file, &fileblock, offset); err != nil {
+			fmt.Println("Error al leer Fileblock: ", err)
+			return
+		}
+		Estructura.PrintFileBlock(buffer, fileblock)
+	}
+	fmt.Println("Fileblocks impresos correctamente.")
+
+	fmt.Println("======End CREATE EXT3======")
+}
+
+// Función para inicializar el journaling
+func initJournaling(newSuperblock Estructura.SuperBlock, file *os.File) error {
+	var journaling Estructura.Journaling
+	journaling.Size = 50
+	journaling.Ultimo = 0
+
+	// Calcula la posición de inicio del journaling (después del superbloque y bitmaps)
+	journalingStart := newSuperblock.S_Inode_Start - int32(binary.Size(Estructura.Journaling{}))*journaling.Size
+
+	// Escribir el journaling en el archivo en la ubicación adecuada
+	for i := 0; i < 50; i++ {
+		if err := Utilidades.WriteObject(file, journaling, int64(journalingStart+int32(i*binary.Size(journaling)))); err != nil {
+			return fmt.Errorf("error al inicializar el journaling: %v", err)
+		}
+	}
+
+	fmt.Println("Journaling inicializado correctamente.")
+	return nil
 }
 
 // Función auxiliar para inicializar inodos y bloques

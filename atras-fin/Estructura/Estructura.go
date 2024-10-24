@@ -3,6 +3,7 @@ package Estructura
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 //  =================================Estructura MRB=================================
@@ -48,8 +49,14 @@ type Partition struct {
 
 func PrintPartition(buffer *bytes.Buffer, data Partition) {
 	fmt.Fprintf(buffer, "\nNombre: %s, Tipo: %s, Inicio: %d, Tamaño: %d, Estado: %s, ID: %s, Ajuste: %s, Correlativo: %d\n",
-		string(data.PART_Name[:]), string(data.PART_Type[:]), data.PART_Start, data.PART_Size, string(data.PART_Status[:]),
-		string(data.PART_Id[:]), string(data.PART_Fit[:]), data.PART_Correlative)
+		strings.TrimRight(string(data.PART_Name[:]), "\x00"),
+		strings.TrimRight(string(data.PART_Type[:]), "\x00"),
+		data.PART_Start,
+		data.PART_Size,
+		strings.TrimRight(string(data.PART_Status[:]), "\x00"),
+		strings.TrimRight(string(data.PART_Id[:]), "\x00"),
+		strings.TrimRight(string(data.PART_Fit[:]), "\x00"),
+		data.PART_Correlative)
 }
 func PrintPartitionnormal(data Partition) {
 	println("\nNombre: %s, Tipo: %s, Inicio: %d, Tamaño: %d, Estado: %s, ID: %s, Ajuste: %s, Correlativo: %d\n",
@@ -264,4 +271,17 @@ func PrintPointerblocknormal(pointerblock PointerBlock) {
 		println("\nPointer %d: %d\n", i, pointer)
 	}
 	println("=========================")
+}
+
+type Journaling struct {
+	Size      int32
+	Ultimo    int32
+	Contenido [50]Content_J
+}
+
+type Content_J struct {
+	Operation [10]byte
+	Path      [100]byte
+	Content   [100]byte
+	Date      [17]byte
 }

@@ -299,7 +299,9 @@ func Funcion_mount(input string, writer io.Writer) {
 func Funcion_mkfs(input string, writer io.Writer) {
 	fs := flag.NewFlagSet("mkfs", flag.ExitOnError)
 	id := fs.String("id", "", "ID")
-	type_ := fs.String("type", "", "Tipo")
+	type_ := fs.String("type", "full", "Tipo")
+	sys := fs.String("fs", "", "sistema")
+
 	fs.Parse(os.Args[1:])
 	matches := re.FindAllStringSubmatch(input, -1)
 
@@ -310,14 +312,14 @@ func Funcion_mkfs(input string, writer io.Writer) {
 		valorFlag = strings.Trim(valorFlag, "\"")
 
 		switch nombreFlag {
-		case "id", "type":
+		case "id", "type", "fs":
 			fs.Set(nombreFlag, valorFlag)
 		default:
 			fmt.Fprint(writer, "Error: Parámetro no encontrado.\n")
 			return
 		}
 	}
-	ManejadorArchivo.Mkfs(*id, *type_, writer.(*bytes.Buffer))
+	ManejadorArchivo.Mkfs(*id, *type_, *sys, writer.(*bytes.Buffer))
 }
 
 // Función para ejecutar el comando LOGIN
