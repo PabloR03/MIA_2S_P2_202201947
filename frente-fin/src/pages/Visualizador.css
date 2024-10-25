@@ -1,0 +1,99 @@
+/* Contenedor principal */
+.unique-container {
+    background-color: #1f1f1f;
+    padding: 2rem;
+    border-radius: 10px;
+    color: #e0e0e0;
+    max-width: 800px;
+    margin: 0 auto;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Título de la sección */
+  h2, h3 {
+    color: #bb86fc;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Contenedor de discos */
+  .unique-disks {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+  }
+  
+  /* Ítems de disco */
+  .unique-disk-item {
+    background-color: #333;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    min-width: 150px;
+  }
+  
+  .unique-disk-item:hover {
+    background-color: #444;
+  }
+  
+  /* Título de los discos */
+  .unique-disk-item h5 {
+    color: #e0e0e0;
+    margin: 0.5rem 0;
+    font-size: 1.1rem;
+  }
+  
+  /* Lista de particiones */
+  .unique-partition-list {
+    padding: 1rem 0;
+  }
+  
+  .unique-partition-item {
+    background-color: #333;
+    margin: 0.5rem 0;
+    padding: 1rem;
+    border-radius: 8px;
+  }
+  
+  .unique-partition-details ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.2rem 0;
+    color: #e0e0e0;
+    font-size: 0.95rem;
+  }
+  
+  .unique-partition-details ul::before {
+    content: "• ";
+    color: #bb86fc;
+  }
+  
+  .unique-partition-item:hover {
+    background-color: #444;
+  }
+  
+  /* Texto informativo */
+  p {
+    text-align: center;
+    color: #aaa;
+  }
+  
+  /* Responsivo */
+  @media (max-width: 600px) {
+    .unique-container {
+      padding: 1.5rem;
+    }
+  
+    .unique-disk-item {
+      min-width: 100px;
+    }
+  
+    .unique-partition-item {
+      padding: 0.8rem;
+    }
+  }
+  

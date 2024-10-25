@@ -124,11 +124,15 @@ func Login(user string, pass string, id string, buffer *bytes.Buffer) {
 	if Login {
 		fmt.Fprintf(buffer, "=-=-=-=-=-=-=FIN LOGIN=-=-=-=-=-=-=")
 		fmt.Fprintf(buffer, "Usuario logueado con éxito en la partición:%s\n", id)
+		fmt.Fprintf(buffer, "Inicio exitoso")
 		ManejadorDisco.MarkPartitionAsLoggedIn(id)
+		Dato.SetIDParticion(id)
+		Dato.SetIDUsuario(user)
+		println(Login)
+		return
 	}
-	Dato.SetIDParticion(id)
-	Dato.SetIDUsuario(user)
-	println(Login)
+	fmt.Fprintf(buffer, "Error LOGIN: No se encontró ningún usuario con el nombre:%s y contraseña", user)
+
 }
 
 func Logout(buffer *bytes.Buffer) {

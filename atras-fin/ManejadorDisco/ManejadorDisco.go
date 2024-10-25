@@ -23,6 +23,31 @@ type PartitionMounted struct {
 // Mapa para almacenar las particiones montadas, organizadas por disco
 var mountedPartitions = make(map[string][]PartitionMounted)
 
+type RutaDisco struct {
+	Ruta string
+}
+
+var ListaRutasDiscos []RutaDisco
+
+func AgregarRutaDisco(ruta string) {
+	ListaRutasDiscos = append(ListaRutasDiscos, RutaDisco{Ruta: ruta})
+}
+
+func EliminarRutaDisco(ruta_disco string) {
+	for i, ruta := range ListaRutasDiscos {
+		if ruta.Ruta == ruta_disco {
+			ListaRutasDiscos = append(ListaRutasDiscos[:i], ListaRutasDiscos[i+1:]...)
+			break
+		}
+	}
+}
+
+func ObtenerRutaDiscos(buffer *bytes.Buffer) {
+	for _, ruta := range ListaRutasDiscos {
+		fmt.Fprintf(buffer, "%s\n", ruta.Ruta)
+	}
+}
+
 // Función para imprimir las particiones montadas
 func PrintMountedPartitions(buffer *bytes.Buffer) {
 	fmt.Fprintf(buffer, "Particiones montadas: \n")
@@ -402,6 +427,53 @@ func ModifyPartition(path string, name string, add int, unit string, buffer *byt
 	return nil
 }
 
+// Estructura para representar una partición en JSON
+type PartitionInfo struct {
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Start  int32  `json:"start"`
+	Size   int32  `json:"size"`
+	Status string `json:"status"`
+}
+
+// Función para leer el MBR desde un archivo binario y devolver las particiones
+func ListPartitions(path string) ([]PartitionInfo, error) {
+	// Abrir el archivo binario
+	file, err := Utilidades.OpenFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("error al abrir el archivo: %v", err)
+	}
+	defer file.Close()
+
+	// Crear una variable para almacenar el MBR
+	var mbr Estructura.MRB
+
+	// Leer el MBR desde el archivo
+	err = Utilidades.ReadObject(file, &mbr, 0) // Leer desde la posición 0
+	if err != nil {
+		return nil, fmt.Errorf("error al leer el MBR: %v", err)
+	}
+
+	// Crear una lista de particiones basada en el MBR
+	var partitions []PartitionInfo
+	for _, partition := range mbr.MRBPartitions {
+		if partition.PART_Size > 0 { // Solo agregar si la partición tiene un tamaño
+			// Limpiar el nombre para eliminar caracteres nulos
+			partitionName := strings.TrimRight(string(partition.PART_Name[:]), "\x00")
+
+			partitions = append(partitions, PartitionInfo{
+				Name:   partitionName,
+				Type:   strings.TrimRight(string(partition.PART_Type[:]), "\x00"),
+				Start:  partition.PART_Start,
+				Size:   partition.PART_Size,
+				Status: strings.TrimRight(string(partition.PART_Status[:]), "\x00"),
+			})
+		}
+	}
+
+	return partitions, nil
+}
+
 func Unmount(id string, buffer *bytes.Buffer) {
 	fmt.Fprintf(buffer, "Desmontando partición con ID:"+id)
 
@@ -698,6 +770,7 @@ func Mkdisk(size int, fit string, unit string, path string, buffer *bytes.Buffer
 	// defer archivo.Close()
 	// fmt.Fprintln(buffer, "Disco creado con éxito en la path: ", path)
 	// println("Disco creado con éxito en la path: ", path)
+	AgregarRutaDisco(path)
 	fmt.Fprintln(buffer, "=-=-=-=-=-=-=FIN MKDISK=-=-=-=-=-=-=")
 }
 
@@ -721,6 +794,7 @@ func Rmdisk(path string, buffer *bytes.Buffer) {
 
 	// ================================= Eliminar las particiones montadas asociadas al disco
 	EliminarDiscoPorRuta(path, buffer)
+	EliminarRutaDisco(path)
 	//fmt.Fprintln(buffer, "Disco eliminado con éxito en la path:", path)
 	fmt.Fprintln(buffer, "=-=-=-=-=-=-=FIN RMDISK=-=-=-=-=-=-=")
 }

@@ -1,0 +1,78 @@
+/* Contenedor principal del formulario de inicio de sesión */
+.login-container {
+    background-color: #1f1f1f;
+    padding: 2rem;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 400px;
+    margin: 100px auto;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Título del login */
+  .login-title {
+    color: #e0e0e0;
+    font-size: 1.8rem;
+    text-align: center;
+    margin-bottom: 2rem;
+    font-weight: 600;
+  }
+  
+  /* Márgenes entre los campos */
+  .login-mb {
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Etiquetas del formulario */
+  .login-label {
+    color: #bb86fc;
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Inputs del formulario */
+  .login-input {
+    width: 100%;
+    padding: 0.8rem;
+    background-color: #333;
+    color: #e0e0e0;
+    border: 1px solid #444;
+    border-radius: 5px;
+    font-size: 1rem;
+  }
+  
+  .login-input:focus {
+    outline: none;
+    border-color: #bb86fc;
+  }
+  
+  /* Botón de inicio de sesión */
+  .login-btn {
+    width: 100%;
+    padding: 0.8rem;
+    background-color: #3f3f3f;
+    color: #bb86fc;
+    border: none;
+    font-size: 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.3s ease;
+  }
+  
+  .login-btn:hover {
+    background-color: #5a5a5a;
+  }
+  
+  /* Responsivo */
+  @media (max-width: 480px) {
+    .login-container {
+      padding: 1.5rem;
+    }
+  
+    .login-title {
+      font-size: 1.5rem;
+    }
+  }
+  

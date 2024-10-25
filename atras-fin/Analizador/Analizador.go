@@ -73,6 +73,8 @@ func AnalyzeCommnad(command string, params string, buffer *bytes.Buffer) {
 		Funcion_Rmusr(params, buffer)
 	} else if strings.Contains(command, "chgrp") {
 		Funcion_Chgrp(params, buffer)
+	} else if strings.Contains(command, "obtenerdiscosruta") {
+		comando_get(params, buffer)
 	} else {
 		fmt.Fprintf(buffer, "Error: Comando no encontrado.\n")
 	}
@@ -293,6 +295,15 @@ func Funcion_mount(input string, writer io.Writer) {
 	// Convertir el nombre a minúsculas antes de pasarlo al Mount
 	lowercaseName := strings.ToLower(*name)
 	ManejadorDisco.Mount(*path, lowercaseName, writer.(*bytes.Buffer))
+}
+
+func comando_get(entrada string, buffer io.Writer) {
+	entrada = strings.TrimSpace(entrada)
+	if len(entrada) > 0 {
+		fmt.Fprintf(buffer, "Error Al Obtener Las Rutas De Los Discos.\n")
+		return
+	}
+	ManejadorDisco.ObtenerRutaDiscos(buffer.(*bytes.Buffer))
 }
 
 // ya revisada
